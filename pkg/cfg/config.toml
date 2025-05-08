@@ -1,0 +1,16 @@
+[log]
+level = "info"
+path = ""
+
+[ddns]
+listen = ":5801"
+endpoint = "xxxx:5801"
+
+[ddns.tencent_cloud]
+secret_id = ""
+secret_key = ""
+domain = ""
+sub_domain = ""
+record_id = ""
+record_line = ""
+value = ""
