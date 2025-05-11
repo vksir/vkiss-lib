@@ -22,8 +22,10 @@ var (
 
 	DdnsListen = NewFlag[string]("listen", "ddns.listen",
 		"listen address").SetDefault(":5801")
-	DdnsServer = NewFlag[string]("endpoint", "ddns.endpoint",
+	DdnsEndpoint = NewFlag[string]("endpoint", "ddns.endpoint",
 		"endpoint address")
+	DdnsInterval = NewFlag[int]("interval", "ddns.interval",
+		"monitor loop interval (minute)").SetDefault(20)
 
 	DdnsTcSecretId = NewFlag[string]("secret-id", "ddns.tencent_cloud.secret_id",
 		"tencent_cloud ddns secret id")

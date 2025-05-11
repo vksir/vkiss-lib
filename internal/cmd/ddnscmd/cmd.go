@@ -30,10 +30,11 @@ func NewCmd() *cobra.Command {
 	monitorCmd := &cobra.Command{
 		Use: "monitor",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return monitor(cfg.DdnsServer.Get())
+			return monitor(cfg.DdnsEndpoint.Get())
 		},
 	}
-	cfg.DdnsServer.Bind(monitorCmd)
+	cfg.DdnsEndpoint.Bind(monitorCmd)
+	cfg.DdnsInterval.Bind(monitorCmd)
 	addTencentCloudDdnsFlags(monitorCmd)
 
 	refreshCmd := &cobra.Command{
@@ -96,31 +97,35 @@ func serve(listen string) error {
 }
 
 func monitor(endpoint string) error {
-	log.Info("starting monitor", "endpoint", endpoint)
+	interval := cfg.DdnsInterval.Get()
+	log.Info("starting monitor", "endpoint", endpoint, "interval", interval)
 
 	curMyIp := ""
+	isFirst := true
 	for {
+		if isFirst {
+			isFirst = false
+		} else {
+			time.Sleep(time.Duration(interval) * time.Minute)
+		}
+
 		myIp, err := ddns.GetMyIp(endpoint)
 		if err != nil {
 			log.Error(err.Error())
-			time.Sleep(time.Minute)
 			continue
 		}
 
 		if myIp == curMyIp {
 			log.Debug("myIp has not changed, do nothing", "myIp", myIp)
-			time.Sleep(time.Minute)
 			continue
 		}
 
 		err = refresh(myIp)
 		if err != nil {
 			log.Error(err.Error())
-			time.Sleep(time.Minute)
 			continue
 		}
 		curMyIp = myIp
-		time.Sleep(time.Minute)
 	}
 }
 
