@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
+	"github.com/vksir/vkiss-lib/internal/ddns"
+	"github.com/vksir/vkiss-lib/pkg/cfg"
+	"github.com/vksir/vkiss-lib/pkg/log"
+	"github.com/vksir/vkiss-lib/pkg/util"
+	"github.com/vksir/vkiss-lib/pkg/util/errutil"
+	"github.com/vksir/vkiss-lib/thirdpkg/systemctl"
+	"github.com/vksir/vkiss-lib/thirdpkg/tencentcloud"
 	"time"
-	"vkiss-lib/internal/ddns"
-	"vkiss-lib/pkg/cfg"
-	"vkiss-lib/pkg/log"
-	"vkiss-lib/pkg/util"
-	"vkiss-lib/pkg/util/errutil"
-	"vkiss-lib/thirdpkg/systemctl"
-	"vkiss-lib/thirdpkg/tencentcloud"
 )
 
 func NewCmd() *cobra.Command {

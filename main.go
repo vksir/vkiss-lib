@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/spf13/cobra"
-	"vkiss-lib/internal/cmd"
+	"github.com/vksir/vkiss-lib/internal/cmd"
 )
 
 func main() {

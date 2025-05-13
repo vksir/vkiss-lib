@@ -4,14 +4,14 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/vksir/vkiss-lib/pkg/log"
+	"github.com/vksir/vkiss-lib/pkg/util/cmdutil"
+	"github.com/vksir/vkiss-lib/pkg/util/errutil"
+	"github.com/vksir/vkiss-lib/pkg/util/fileutil"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"text/template"
-	"vkiss-lib/pkg/log"
-	"vkiss-lib/pkg/util/cmdutil"
-	"vkiss-lib/pkg/util/errutil"
-	"vkiss-lib/pkg/util/fileutil"
 )
 
 const (

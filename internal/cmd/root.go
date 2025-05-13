@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"vkiss-lib/internal/cmd/ddnscmd"
-	"vkiss-lib/pkg/cfg"
-	"vkiss-lib/pkg/log"
+	"github.com/vksir/vkiss-lib/internal/cmd/ddnscmd"
+	"github.com/vksir/vkiss-lib/pkg/cfg"
+	"github.com/vksir/vkiss-lib/pkg/log"
 )
 
 func Execute() error {

@@ -1,10 +1,10 @@
 package util
 
 import (
+	"github.com/vksir/vkiss-lib/pkg/log"
+	"github.com/vksir/vkiss-lib/pkg/util/errutil"
+	"github.com/vksir/vkiss-lib/pkg/util/fileutil"
 	"os"
-	"vkiss-lib/pkg/log"
-	"vkiss-lib/pkg/util/errutil"
-	"vkiss-lib/pkg/util/fileutil"
 )
 
 const (

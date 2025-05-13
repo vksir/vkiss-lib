@@ -3,11 +3,11 @@ package fileutil
 import (
 	"archive/zip"
 	"errors"
+	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
-	"vkiss-lib/pkg/util/errutil"
 )
 
 func Exist(path string) bool {

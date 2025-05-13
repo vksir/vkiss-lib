@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"io"
 	"log/slog"
 	"os"
 	"runtime"
 	"strings"
 	"time"
-	"vkiss-lib/pkg/util/errutil"
 )
 
 const slogFields = "slog_fields"

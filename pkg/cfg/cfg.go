@@ -4,9 +4,9 @@ import (
 	_ "embed"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/vksir/vkiss-lib/pkg/util/errutil"
+	"github.com/vksir/vkiss-lib/pkg/util/fileutil"
 	"path/filepath"
-	"vkiss-lib/pkg/util/errutil"
-	"vkiss-lib/pkg/util/fileutil"
 )
 
 const DefaultConfPath = "/etc/vkiss/config.toml"

@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-resty/resty/v2"
+	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"net/http"
 	"net/url"
-	"vkiss-lib/pkg/util/errutil"
 )
 
 func GetMyIp(endpoint string) (string, error) {
