@@ -3,6 +3,7 @@ package fileutil
 import (
 	"archive/zip"
 	"errors"
+	"github.com/vksir/vkiss-lib/pkg/log"
 	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"io"
 	"os"
@@ -184,5 +185,30 @@ func Unzip(src string, dst string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func InstallSelf(path string) error {
+	src, err := os.Executable()
+	if err != nil {
+		return errutil.Wrap(err)
+	}
+
+	dst := path
+
+	err = Rm(dst)
+	if err != nil {
+		return errutil.Wrap(err)
+	}
+	err = Cp(src, dst)
+	if err != nil {
+		return errutil.Wrap(err)
+	}
+	err = os.Chmod(dst, 0755)
+	if err != nil {
+		return errutil.Wrap(err)
+	}
+
+	log.Info("install success", "bin", dst)
 	return nil
 }

@@ -3,19 +3,22 @@ package log
 import (
 	"context"
 	"fmt"
-	"github.com/spf13/cobra"
 	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 )
 
 const slogFields = "slog_fields"
 
 var logger = NewLogger("")
+
+func DefaultLogger() *Logger {
+	return logger
+}
 
 func SetLevel(level string) error {
 	return logger.SetLevel(level)
@@ -203,7 +206,7 @@ func NewLogger(path string) *Logger {
 	var w io.Writer = os.Stderr
 	if path != "" {
 		file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o640)
-		cobra.CheckErr(err)
+		errutil.Check(err)
 		w = io.MultiWriter(w, file)
 	}
 
@@ -216,7 +219,9 @@ func NewLogger(path string) *Logger {
 			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 				if a.Key == slog.SourceKey {
 					source := a.Value.Any().(*slog.Source)
-					source.File = source.Function[strings.LastIndex(source.Function, "/")+1:]
+					//source.File = source.Function[strings.LastIndex(source.Function, "/")+1:]
+					dir, file := filepath.Split(source.File)
+					source.File = fmt.Sprintf("%s/%s:%d", filepath.Base(dir), file, source.Line)
 				}
 				return a
 			},
@@ -252,6 +257,5 @@ func AppendCtx(ctx context.Context, args ...any) context.Context {
 func Init(path string, level string) {
 	logger = NewLogger(path)
 	err := logger.SetLevel(level)
-	cobra.CheckErr(err)
-	cobra.WriteStringAndCheck(os.Stderr, fmt.Sprintf("set log level: %s\n", level))
+	errutil.Check(err)
 }

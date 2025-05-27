@@ -5,10 +5,16 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"reflect"
 )
 
-type Flag[T any] struct {
+// flagType 在添加更多类型前，需要在 Flag.Bind 和 Flag.Get 添加对应 case
+type flagType interface {
+	string | bool | int | uint | int64 | uint64
+}
+
+type Flag[T flagType] struct {
 	Name       string
 	Short      string
 	Usage      string
@@ -18,8 +24,8 @@ type Flag[T any] struct {
 	Required   bool
 }
 
-func NewFlag[T any](name, cfg, usage string) *Flag[T] {
-	return &Flag[T]{Name: name, Cfg: cfg}
+func NewFlag[T flagType](name, cfg, usage string) *Flag[T] {
+	return &Flag[T]{Name: name, Cfg: cfg, Usage: usage}
 }
 
 func (f *Flag[T]) SetShort(v string) *Flag[T] {
@@ -67,16 +73,16 @@ func (f *Flag[T]) Bind(cmd *cobra.Command) {
 	case uint64:
 		flagSet.Uint64P(f.Name, f.Short, def.(uint64), f.Usage)
 	default:
-		cobra.CheckErr(fmt.Errorf("type %T not supported", t))
+		errutil.Check(fmt.Errorf("type %T not supported", t))
 	}
 
 	if f.Required {
 		err := cmd.MarkFlagRequired(f.Name)
-		cobra.CheckErr(err)
+		errutil.Check(err)
 	}
 
 	err := viper.BindPFlag(f.Cfg, flagSet.Lookup(f.Name))
-	cobra.CheckErr(err)
+	errutil.Check(err)
 }
 
 func (f *Flag[T]) Get() T {
@@ -97,7 +103,7 @@ func (f *Flag[T]) Get() T {
 	case uint64:
 		v = viper.GetUint64(f.Cfg)
 	default:
-		cobra.CheckErr(fmt.Errorf("type %T not supported", t))
+		errutil.Check(fmt.Errorf("type %T not supported", t))
 	}
 
 	return v.(T)

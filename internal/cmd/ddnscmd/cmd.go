@@ -4,14 +4,39 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
+	"github.com/vksir/vkiss-lib/internal/constant"
 	"github.com/vksir/vkiss-lib/internal/ddns"
 	"github.com/vksir/vkiss-lib/pkg/cfg"
 	"github.com/vksir/vkiss-lib/pkg/log"
-	"github.com/vksir/vkiss-lib/pkg/util"
 	"github.com/vksir/vkiss-lib/pkg/util/errutil"
+	"github.com/vksir/vkiss-lib/pkg/util/fileutil"
 	"github.com/vksir/vkiss-lib/thirdpkg/systemctl"
 	"github.com/vksir/vkiss-lib/thirdpkg/tencentcloud"
 	"time"
+)
+
+var (
+	DdnsListen = cfg.NewFlag[string]("listen", "ddns.listen",
+		"listen address").SetDefault(":5801")
+	DdnsEndpoint = cfg.NewFlag[string]("endpoint", "ddns.endpoint",
+		"endpoint address")
+	DdnsInterval = cfg.NewFlag[int]("interval", "ddns.interval",
+		"monitor loop interval (minute)").SetDefault(20)
+
+	DdnsTcSecretId = cfg.NewFlag[string]("secret-id", "ddns.tencent_cloud.secret_id",
+		"tencent_cloud ddns secret id")
+	DdnsTcSecretKey = cfg.NewFlag[string]("secret-key", "ddns.tencent_cloud.secret_key",
+		"tencent_cloud ddns secret key")
+	DdnsTcDomain = cfg.NewFlag[string]("domain", "ddns.tencent_cloud.domain",
+		"tencent_cloud ddns domain")
+	DdnsTcSubDomain = cfg.NewFlag[string]("sub-domain", "ddns.tencent_cloud.sub_domain",
+		"tencent_cloud ddns sub domain")
+	DdnsTcRecordId = cfg.NewFlag[uint64]("record-id", "ddns.tencent_cloud.record_id",
+		"tencent_cloud ddns record id")
+	DdnsTcRecordLine = cfg.NewFlag[string]("record-line", "ddns.tencent_cloud.record_line",
+		"tencent_cloud ddns record line")
+	DdnsTcValue = cfg.NewFlag[string]("value", "ddns.tencent_cloud.value",
+		"tencent_cloud ddns value")
 )
 
 func NewCmd() *cobra.Command {
@@ -22,28 +47,28 @@ func NewCmd() *cobra.Command {
 	serverCmd := &cobra.Command{
 		Use: "server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return serve(cfg.DdnsListen.Get())
+			return serve(DdnsListen.Get())
 		},
 	}
-	cfg.DdnsListen.Bind(serverCmd)
+	DdnsListen.Bind(serverCmd)
 
 	monitorCmd := &cobra.Command{
 		Use: "monitor",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return monitor(cfg.DdnsEndpoint.Get())
+			return monitor(DdnsEndpoint.Get())
 		},
 	}
-	cfg.DdnsEndpoint.Bind(monitorCmd)
-	cfg.DdnsInterval.Bind(monitorCmd)
+	DdnsEndpoint.Bind(monitorCmd)
+	DdnsInterval.Bind(monitorCmd)
 	addTencentCloudDdnsFlags(monitorCmd)
 
 	refreshCmd := &cobra.Command{
 		Use: "refresh",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return refresh(cfg.DdnsTcValue.Get())
+			return refresh(DdnsTcValue.Get())
 		},
 	}
-	cfg.DdnsTcValue.Bind(refreshCmd)
+	DdnsTcValue.Bind(refreshCmd)
 	addTencentCloudDdnsFlags(refreshCmd)
 
 	installCmd := newInstallCmd()
@@ -80,67 +105,64 @@ func newInstallCmd() *cobra.Command {
 }
 
 func addTencentCloudDdnsFlags(cmd *cobra.Command) {
-	cfg.DdnsTcSecretId.Bind(cmd)
-	cfg.DdnsTcSecretKey.Bind(cmd)
-	cfg.DdnsTcDomain.Bind(cmd)
-	cfg.DdnsTcSubDomain.Bind(cmd)
-	cfg.DdnsTcRecordId.Bind(cmd)
-	cfg.DdnsTcRecordLine.Bind(cmd)
+	DdnsTcSecretId.Bind(cmd)
+	DdnsTcSecretKey.Bind(cmd)
+	DdnsTcDomain.Bind(cmd)
+	DdnsTcSubDomain.Bind(cmd)
+	DdnsTcRecordId.Bind(cmd)
+	DdnsTcRecordLine.Bind(cmd)
 }
 
 func serve(listen string) error {
 	e := gin.Default()
-	g := e.Group("/")
-	ddns.LoadRouter(g)
+	ddns.LoadRouter(&e.RouterGroup)
 	log.Info("starting serv", "listen", listen)
 	return e.Run(listen)
 }
 
 func monitor(endpoint string) error {
-	interval := cfg.DdnsInterval.Get()
+	interval := DdnsInterval.Get()
 	log.Info("starting monitor", "endpoint", endpoint, "interval", interval)
 
+	// 失败时快循环，成功时慢循环
 	curMyIp := ""
-	isFirst := true
 	for {
-		if isFirst {
-			isFirst = false
-		} else {
-			time.Sleep(time.Duration(interval) * time.Minute)
-		}
-
 		myIp, err := ddns.GetMyIp(endpoint)
 		if err != nil {
 			log.Error(err.Error())
+			time.Sleep(time.Minute)
 			continue
 		}
 
 		if myIp == curMyIp {
 			log.Debug("myIp has not changed, do nothing", "myIp", myIp)
+			time.Sleep(time.Duration(interval) * time.Minute)
 			continue
 		}
 
 		err = refresh(myIp)
 		if err != nil {
 			log.Error(err.Error())
+			time.Sleep(time.Minute)
 			continue
 		}
 		curMyIp = myIp
+		time.Sleep(time.Duration(interval) * time.Minute)
 	}
 }
 
 func refresh(myIp string) error {
 	log.Warn("begin refresh myIp", "myIp", myIp)
 	req := &tencentcloud.ModifyDynamicDNSRequest{
-		Domain:     cfg.DdnsTcDomain.Get(),
-		SubDomain:  cfg.DdnsTcSubDomain.Get(),
-		RecordId:   cfg.DdnsTcRecordId.Get(),
-		RecordLine: cfg.DdnsTcRecordLine.Get(),
+		Domain:     DdnsTcDomain.Get(),
+		SubDomain:  DdnsTcSubDomain.Get(),
+		RecordId:   DdnsTcRecordId.Get(),
+		RecordLine: DdnsTcRecordLine.Get(),
 		Value:      myIp,
 	}
 	secret := &tencentcloud.Secret{
-		Id:  cfg.DdnsTcSecretId.Get(),
-		Key: cfg.DdnsTcSecretKey.Get(),
+		Id:  DdnsTcSecretId.Get(),
+		Key: DdnsTcSecretKey.Get(),
 	}
 	info, err := tencentcloud.ModifyDynamicDns(req, secret)
 	if err != nil {
@@ -154,19 +176,19 @@ var (
 	serverService = &systemctl.Service{
 		Name:             "ddns-server",
 		Description:      "ddns server",
-		ExecStart:        fmt.Sprintf("%s ddns server -c %s", util.ExePath, cfg.DefaultConfPath),
+		ExecStart:        fmt.Sprintf("%s ddns server -c %s", constant.ExePath, constant.ConfPath),
 		RestartOnFailure: true,
 	}
 	monitorService = &systemctl.Service{
 		Name:             "ddns-monitor",
 		Description:      "ddns monitor",
-		ExecStart:        fmt.Sprintf("%s ddns monitor -c %s", util.ExePath, cfg.DefaultConfPath),
+		ExecStart:        fmt.Sprintf("%s ddns monitor -c %s", constant.ExePath, constant.ConfPath),
 		RestartOnFailure: true,
 	}
 )
 
 func installServer() error {
-	err := util.InstallSelf()
+	err := fileutil.InstallSelf(constant.ExePath)
 	if err != nil {
 		return errutil.Wrap(err)
 	}
@@ -192,7 +214,7 @@ func installServer() error {
 	return nil
 }
 func installMonitor() error {
-	err := util.InstallSelf()
+	err := fileutil.InstallSelf(constant.ExePath)
 	if err != nil {
 		return errutil.Wrap(err)
 	}
