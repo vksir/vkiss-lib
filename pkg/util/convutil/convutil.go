@@ -1,7 +1,9 @@
 package convutil
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"strconv"
 )
 
@@ -18,4 +20,14 @@ func String(a any) string {
 	default:
 		return fmt.Sprintf("%v", a)
 	}
+}
+
+func Json(a any) ([]byte, error) {
+	return json.MarshalIndent(a, "", "    ")
+}
+
+func MustJsonString(a any) string {
+	content, err := Json(a)
+	errutil.Check(err)
+	return string(content)
 }

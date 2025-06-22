@@ -5,6 +5,7 @@ import (
 	"github.com/vksir/vkiss-lib/pkg/log"
 	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"github.com/vksir/vkiss-lib/pkg/util/fileutil"
+	"sync"
 )
 
 type keyType interface {
@@ -16,14 +17,15 @@ type Key[T keyType] struct {
 }
 
 var cache = viper.New()
+var cacheLock sync.Mutex
 
 func NewKey[T keyType](key string) *Key[T] {
 	return &Key[T]{key: key}
 }
 
-func (k *Key[T]) Set(v T) {
+func (k *Key[T]) Save(v T) {
 	cache.Set(k.key, v)
-	err := Save()
+	err := save()
 	if err != nil {
 		log.Error("set cache failed", "err", err)
 	}
@@ -37,7 +39,10 @@ func (k *Key[T]) Get() T {
 	return v.(T)
 }
 
-func Save() error {
+func save() error {
+	cacheLock.Lock()
+	defer cacheLock.Unlock()
+
 	err := cache.WriteConfig()
 	if err != nil {
 		return errutil.Wrap(err)

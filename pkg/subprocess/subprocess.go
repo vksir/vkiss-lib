@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"errors"
-	"github.com/vksir/vkiss-lib/pkg/cfg"
 	"github.com/vksir/vkiss-lib/pkg/log"
 	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"io"
@@ -17,13 +16,6 @@ import (
 var (
 	ErrAlreadyStarted = errors.New("already started")
 	ErrNotStartedYet  = errors.New("not started yet")
-
-	ErrGraceFulShutdownTimeout = errors.New("graceful shutdown timeout")
-)
-
-var (
-	CfgReader = cfg.NewFlag[string]("subprocess-reader", "subprocess.reader",
-		"subprocess reader type: [lines|stream]").SetDefault("lines")
 )
 
 type OutFunc = func(*string)
@@ -77,11 +69,8 @@ func (p *SubProcess) SetTimeout(d time.Duration) *SubProcess {
 	return p
 }
 
-func (p *SubProcess) SetLogger(name string, l *log.Logger) *SubProcess {
-	if name != "" {
-		l = l.With("subprocess", name)
-	}
-	p.log = l
+func (p *SubProcess) SetLogger(l *log.Logger) *SubProcess {
+	p.log = l.With("subprocess", p.name)
 	return p
 }
 
@@ -220,20 +209,6 @@ func (p *SubProcess) loopOutput() {
 	p.log.Info("begin loop output")
 
 	scanner := bufio.NewScanner(io.MultiReader(p.stdout, p.stderr))
-
-	//count := 0
-	//scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	//	advance, token, err = bufio.ScanLines(data, atEOF)
-	//	fmt.Println(advance, token, err)
-	//	if advance == 0 {
-	//		count++
-	//		if count >= 3 {
-	//			count = 0
-	//			return len(data), data, nil
-	//		}
-	//	}
-	//	return advance, token, err
-	//})
 
 	for scanner.Scan() {
 		out := scanner.Text()

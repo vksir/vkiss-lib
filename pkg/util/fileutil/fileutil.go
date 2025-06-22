@@ -3,13 +3,21 @@ package fileutil
 import (
 	"archive/zip"
 	"errors"
-	"github.com/vksir/vkiss-lib/pkg/log"
 	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+var home string
+
+func Home() string {
+	var err error
+	home, err = os.UserHomeDir()
+	errutil.Check(err)
+	return home
+}
 
 func Exist(path string) bool {
 	_, err := os.Stat(path)
@@ -31,10 +39,20 @@ func Rm(path string) error {
 func MkDir(paths ...string) error {
 	for _, p := range paths {
 		if err := os.MkdirAll(p, 0o755); err != nil {
-			return errutil.Wrap(err)
+			return errutil.WrapPathErr("MkdirAll", p, err)
 		}
 	}
 	return nil
+}
+
+func MkdirAndReturn(path string) (string, error) {
+	if !Exist(path) {
+		err := MkDir(path)
+		if err != nil {
+			return "", errutil.Wrap(err)
+		}
+	}
+	return path, nil
 }
 
 func ClearDir(path string) error {
@@ -208,7 +226,11 @@ func InstallSelf(path string) error {
 	if err != nil {
 		return errutil.Wrap(err)
 	}
-
-	log.Info("install success", "bin", dst)
 	return nil
+}
+
+func init() {
+	var err error
+	home, err = os.UserHomeDir()
+	errutil.Check(err)
 }

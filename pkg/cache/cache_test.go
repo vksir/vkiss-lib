@@ -12,9 +12,9 @@ func TestKey(t *testing.T) {
 	k2 := NewKey[int]("k2")
 	k3 := NewKey[bool]("k3")
 
-	k1.Set("v1")
-	k2.Set(2)
-	k3.Set(true)
+	k1.Save("v1")
+	k2.Save(2)
+	k3.Save(true)
 
 	assert.Equal(t, "v1", k1.Get())
 	assert.Equal(t, 2, k2.Get())

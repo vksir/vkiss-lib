@@ -9,7 +9,7 @@ import (
 var topics = make(map[string]map[string]Callback)
 var topicLock sync.RWMutex
 
-type Callback = func(ctx context.Context, msg any)
+type Callback = func(ctx context.Context, msgAny any)
 
 func Notify(ctx context.Context, topic string, msg any) {
 	topicLock.RLock()
@@ -24,7 +24,7 @@ func Notify(ctx context.Context, topic string, msg any) {
 	}
 }
 
-func Subscribe(topic, subscriber string, callback Callback) error {
+func Subscribe(topic, subscriber string, callback Callback) {
 	topicLock.Lock()
 	defer topicLock.Unlock()
 
@@ -34,7 +34,6 @@ func Subscribe(topic, subscriber string, callback Callback) error {
 	}
 	tp[subscriber] = callback
 	log.Warn("subscribe success", "topic", topic, "subscriber", subscriber, "callback", callback)
-	return nil
 }
 
 func Unsubscribe(topic, subscriber string) {
