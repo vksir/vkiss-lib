@@ -16,10 +16,6 @@ type M struct {
 	ID string `gorm:"primarykey" json:"id"`
 }
 
-func (m *M) Preload(tx *gorm.DB) *gorm.DB {
-	return tx
-}
-
 func (m *M) Update(tx *gorm.DB, a any) error {
 	res := tx.Updates(a)
 	return res.Error
@@ -29,10 +25,6 @@ type A struct {
 	M
 	HasOneB B      `json:"b" gorm:"constraint:OnDelete:CASCADE"`
 	V       string `json:"v"`
-}
-
-func (m *A) Preload(tx *gorm.DB) *gorm.DB {
-	return tx.Preload("HasOneB.HasManyC")
 }
 
 func (m *A) Update(tx *gorm.DB, a any) error {
@@ -80,10 +72,6 @@ type E struct {
 	V        string `json:"v"`
 }
 
-func (m *E) Preload(tx *gorm.DB) *gorm.DB {
-	return tx.Preload("HasManyD.BelongsToA.HasOneB.HasManyC")
-}
-
 func (m *E) Update(tx *gorm.DB, a any) error {
 	v := a.(*E)
 
@@ -107,10 +95,6 @@ type F struct {
 	M
 	HasManyG []G    `json:"g" gorm:"constraint:OnDelete:CASCADE"`
 	V        string `json:"v"`
-}
-
-func (m *F) Preload(tx *gorm.DB) *gorm.DB {
-	return tx.Preload("HasManyG.HasManyH")
 }
 
 func (m *F) Update(tx *gorm.DB, a any) error {
@@ -147,7 +131,7 @@ type H struct {
 
 func initModRepo(t *testing.T) []A {
 	if db == nil {
-		dbPath := filepath.Join(fileutil.Home(), "aurora-admin", "aurora-admin.db")
+		dbPath := filepath.Join(fileutil.Home, "aurora-admin", "aurora-admin.db")
 		fmt.Println("dbPath:", dbPath)
 		Init(dbPath, []any{})
 	}

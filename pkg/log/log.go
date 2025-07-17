@@ -109,6 +109,14 @@ func (l *Logger) With(args ...any) *Logger {
 	return &Logger{logger: l.logger.With(args...), level: l.level}
 }
 
+func (l *Logger) Log(level slog.Level, msg string, args ...any) {
+	l.log(context.Background(), level, msg, args...)
+}
+
+func (l *Logger) LogC(ctx context.Context, level slog.Level, msg string, args ...any) {
+	l.log(ctx, level, msg, args...)
+}
+
 func (l *Logger) Debug(msg string, args ...any) {
 	l.log(context.Background(), slog.LevelDebug, msg, args...)
 }
@@ -139,6 +147,14 @@ func (l *Logger) Error(msg string, args ...any) {
 
 func (l *Logger) ErrorC(ctx context.Context, msg string, args ...any) {
 	l.log(ctx, slog.LevelError, msg, args...)
+}
+
+func (l *Logger) LogF(level slog.Level, format string, a ...any) {
+	l.logF(context.Background(), level, format, a...)
+}
+
+func (l *Logger) LogFC(ctx context.Context, level slog.Level, format string, a ...any) {
+	l.logF(ctx, level, format, a...)
 }
 
 func (l *Logger) DebugF(format string, a ...any) {
@@ -203,7 +219,7 @@ func (l *Logger) logF(ctx context.Context, level slog.Level, format string, a ..
 }
 
 func NewLogger(path string) *Logger {
-	var w io.Writer = os.Stderr
+	var w io.Writer = os.Stdout
 	if path != "" {
 		file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o640)
 		errutil.Check(err)
@@ -221,7 +237,7 @@ func NewLogger(path string) *Logger {
 					source := a.Value.Any().(*slog.Source)
 					//source.File = source.Function[strings.LastIndex(source.Function, "/")+1:]
 					dir, file := filepath.Split(source.File)
-					source.File = fmt.Sprintf("%s/%s:%d", filepath.Base(dir), file, source.Line)
+					source.File = fmt.Sprintf("%s/%s", filepath.Base(dir), file)
 				}
 				return a
 			},
@@ -258,4 +274,5 @@ func Init(path string, level string) {
 	logger = NewLogger(path)
 	err := logger.SetLevel(level)
 	errutil.Check(err)
+	logger.Warn("init log", "level", level, "path", path)
 }

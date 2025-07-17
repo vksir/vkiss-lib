@@ -16,8 +16,6 @@ func main() {
 	var cfgFile string
 	root.PersistentFlags().StringVarP(&cfgFile, "config", "c", constant.ConfPath,
 		"config file")
-	cfg.LogPath.Bind(root)
-	cfg.LogLevel.Bind(root)
 
 	cobra.OnInitialize(func() {
 		cfg.Init(cfgFile, assets.DefaultConfig)

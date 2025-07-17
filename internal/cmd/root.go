@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"github.com/vksir/vkiss-lib/internal/cmd/ddnscmd"
+	"github.com/vksir/vkiss-lib/pkg/cfg"
 )
 
 func NewRootCmd() *cobra.Command {
@@ -13,5 +14,7 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	root.AddCommand(ddnscmd.NewCmd())
+	cfg.LogPath.Bind(root)
+	cfg.LogLevel.Bind(root)
 	return root
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/vksir/vkiss-lib/pkg/cfg"
 	"github.com/vksir/vkiss-lib/pkg/log"
-	"github.com/vksir/vkiss-lib/pkg/subprocess"
+	"github.com/vksir/vkiss-lib/pkg/service"
 	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"os/exec"
 	"path/filepath"
@@ -30,9 +30,12 @@ func (s *Steamcmd) SetForceInstallDir(dir string) *Steamcmd {
 	return s
 }
 
-func (s *Steamcmd) DoWorkShopDownloadItem(ctx context.Context, appId, publishedFileId string) error {
+func (s *Steamcmd) DoWorkShopDownloadItem(ctx context.Context, appId string, publishedFileId ...string) error {
 	s.logger.InfoC(ctx, "begin DoWorkShopDownloadItem", "appId", appId, "publishedFileId", publishedFileId)
-	extArgs := []string{"+workshop_download_item", appId, publishedFileId}
+	var extArgs []string
+	for _, id := range publishedFileId {
+		extArgs = append(extArgs, "+workshop_download_item", appId, id)
+	}
 	err := s.execute(ctx, extArgs)
 	if err != nil {
 		s.logger.ErrorC(ctx, "DoWorkShopDownloadItem failed", "appId", appId, "publishedFileId", publishedFileId, "err", err)
@@ -66,13 +69,13 @@ func (s *Steamcmd) execute(ctx context.Context, extArgs []string) error {
 	if err != nil {
 		return errutil.Wrap(err)
 	}
-	process := subprocess.New("steamcmd", exe, args).
+	process := service.NewSubprocess("steamcmd", exe, args).
 		SetLogger(s.logger).
 		SetDir(filepath.Dir(exe))
 
 	logger := s.logger.With("output", "steamcmd")
-	process.RegisterOutFunc("log", func(line *string) {
-		logger.Debug(*line)
+	process.RegisterOutputFunc("log", func(line []byte) {
+		logger.Debug(string(line))
 	})
 
 	err = process.Start(ctx)

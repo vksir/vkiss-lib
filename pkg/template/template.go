@@ -1,6 +1,7 @@
 package template
 
 import (
+	"fmt"
 	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"io"
 	"os"
@@ -37,4 +38,14 @@ func ExecuteFile(t Template, path string) error {
 	}
 	defer func() { _ = f.Close() }()
 	return Execute(t, f)
+}
+
+func ExecuteFiles(m map[string]Template) error {
+	for p, t := range m {
+		err := ExecuteFile(t, p)
+		if err != nil {
+			return fmt.Errorf("execute template %s failed: %w", p, err)
+		}
+	}
+	return nil
 }

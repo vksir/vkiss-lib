@@ -12,19 +12,13 @@ type api struct{}
 func (a *api) Resource() []Resource {
 	return []Resource{
 		{
-			RelativePath: "/api/resource/global",
-			Handler: []Handler{
-				GetResource[resourceResp](a.getResource),
-			},
-		},
-		{
 			RelativePath: "/api/resource",
-			Handler: []Handler{
-				GetResource[resourceResp](a.indexResource),
-				ListResource[listResourceReq, resourceResp](a.listResource),
-				CreateResource[createResourceReq, resourceResp](a.createResource),
-				UpdateResource[updateResourceReq, resourceResp](a.updateResource),
-				DeleteResource(a.deleteResource),
+			Handler: []Endpoint{
+				GetByID[resourceResp](a.getResource),
+				GetList[listResourceReq, resourceResp](a.listResource),
+				Create[createResourceReq, resourceResp](a.createResource),
+				UpdateByID[updateResourceReq, resourceResp](a.updateResource),
+				DeleteByID(a.deleteResource),
 			},
 		},
 	}
@@ -43,14 +37,9 @@ type updateResourceReq struct {
 	Name string `json:"name"`
 }
 
-func (a *api) getResource(ctx context.Context) (resourceResp, error) {
+func (a *api) getResource(ctx context.Context, id string) (resourceResp, error) {
 	fmt.Println("get")
 	return resourceResp{Id: "1"}, nil
-}
-
-func (a *api) indexResource(ctx context.Context, id string) (resourceResp, error) {
-	fmt.Println("index:", id)
-	return resourceResp{Id: id}, nil
 }
 
 func (a *api) listResource(ctx context.Context, req listResourceReq) ([]resourceResp, error) {

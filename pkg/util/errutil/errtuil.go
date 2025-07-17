@@ -1,10 +1,16 @@
 package errutil
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+)
+
+var (
+	ErrNotFound = errors.New("not found")
+	ErrBusy     = errors.New("busy")
 )
 
 func wrap(err error) error {
@@ -13,7 +19,7 @@ func wrap(err error) error {
 	runtime.Callers(3, pcs[:])
 	f, _ := runtime.CallersFrames(pcs[:]).Next()
 	dir, file := filepath.Split(f.File)
-	return fmt.Errorf("%s/%s:%d > %w", filepath.Base(dir), file, f.Line, err)
+	return fmt.Errorf("%s/%s:%d %w", filepath.Base(dir), file, f.Line, err)
 }
 
 func Wrap(err error) error {
@@ -24,12 +30,12 @@ func WrapF(format string, a ...any) error {
 	return wrap(fmt.Errorf(format, a...))
 }
 
-func WrapPathErr(op string, path string, err error) error {
+func WrapPath(op string, path string, err error) error {
 	return wrap(&os.PathError{Op: op, Path: path, Err: err})
 }
 
-func WrapOsNotExistErr(path string) error {
-	return wrap(fmt.Errorf("%w: %s", os.ErrNotExist, path))
+func WrapNotFound(dst string) error {
+	return wrap(fmt.Errorf("%w: %s", ErrNotFound, dst))
 }
 
 func Check(err error) {

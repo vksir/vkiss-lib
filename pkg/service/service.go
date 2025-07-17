@@ -4,16 +4,16 @@ import (
 	"context"
 	"errors"
 	"github.com/vksir/vkiss-lib/pkg/log"
-	"github.com/vksir/vkiss-lib/pkg/subprocess"
 	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"sync"
 	"time"
 )
 
 var (
-	ErrServiceBusy              = errors.New("service is busy")
-	ErrServiceHasNotBeenStarted = errors.New("service has not been started")
-	ErrServiceRunning           = errors.New("service is running")
+	ErrBusy           = errors.New("busy")
+	ErrRunningNow     = errors.New("running now")
+	ErrAlreadyStarted = errors.New("already started")
+	ErrNotStartedYet  = errors.New("not started yet")
 )
 
 type Status int
@@ -41,12 +41,12 @@ const (
 )
 
 type Interface interface {
-	PrepareProcess(ctx context.Context) (map[string]*subprocess.SubProcess, error)
-	WaitActive(ctx context.Context) bool
-	GracefulShutdown(ctx context.Context, process map[string]*subprocess.SubProcess)
+	PrepareProcess(ctx context.Context, processCtx context.Context) (map[string]*SubProcess, error)
+	WaitActive(waitActiveCtx context.Context) bool
+	GracefulShutdown(ctx context.Context, process map[string]*SubProcess)
 }
 
-func InterruptGracefulShutdown(ctx context.Context, process map[string]*subprocess.SubProcess) {
+func InterruptGracefulShutdown(ctx context.Context, process map[string]*SubProcess) {
 	for _, p := range process {
 		err := p.Interrupt()
 		if err != nil {
@@ -56,18 +56,22 @@ func InterruptGracefulShutdown(ctx context.Context, process map[string]*subproce
 }
 
 type serviceRuntime struct {
-	process          map[string]*subprocess.SubProcess
+	process          map[string]*SubProcess
 	processCtx       context.Context
 	processCancel    context.CancelFunc
 	waitActiveCtx    context.Context
 	waitActiveCancel context.CancelFunc
 }
 
-func newServiceRuntime(process map[string]*subprocess.SubProcess) *serviceRuntime {
+func (r *serviceRuntime) Close() {
+	r.processCancel()
+	r.waitActiveCancel()
+}
+
+func newServiceRuntime() *serviceRuntime {
 	processCtx, processCancel := context.WithCancel(context.Background())
 	waitActiveCtx, waitActiveCancel := context.WithCancel(context.Background())
 	return &serviceRuntime{
-		process:          process,
 		processCtx:       processCtx,
 		processCancel:    processCancel,
 		waitActiveCtx:    waitActiveCtx,
@@ -96,20 +100,20 @@ func (s *Service) Running() bool {
 	return s.runtime != nil
 }
 
-func (s *Service) Control(f func(process map[string]*subprocess.SubProcess) error) error {
+func (s *Service) Control(f func(process map[string]*SubProcess) error) error {
 	if !s.busyLock.TryLock() {
-		return ErrServiceBusy
+		return ErrBusy
 	}
 	defer s.busyLock.Unlock()
-	if s.runtime == nil {
-		return ErrServiceHasNotBeenStarted
+	if !s.Running() {
+		return ErrNotStartedYet
 	}
 	return f(s.runtime.process)
 }
 
 func (s *Service) Start(ctx context.Context) error {
 	if !s.busyLock.TryLock() {
-		return ErrServiceBusy
+		return ErrBusy
 	}
 	defer s.busyLock.Unlock()
 	return s.start(ctx)
@@ -117,7 +121,7 @@ func (s *Service) Start(ctx context.Context) error {
 
 func (s *Service) Stop(ctx context.Context) error {
 	if !s.busyLock.TryLock() {
-		return ErrServiceBusy
+		return ErrBusy
 	}
 	defer s.busyLock.Unlock()
 	s.stop(ctx)
@@ -126,25 +130,26 @@ func (s *Service) Stop(ctx context.Context) error {
 
 func (s *Service) Restart(ctx context.Context) error {
 	if !s.busyLock.TryLock() {
-		return ErrServiceBusy
+		return ErrBusy
 	}
 	defer s.busyLock.Unlock()
 	return s.restart(ctx)
 }
 
 func (s *Service) start(ctx context.Context) error {
-	if s.runtime != nil {
-		return ErrServiceRunning
+	if s.Running() {
+		return ErrAlreadyStarted
 	}
 
+	var err error
 	s.status = StatusStarting
 	ctx = log.AppendCtx(ctx, "tag", "starting")
-	process, err := s.instance.PrepareProcess(ctx)
+	svcRt := newServiceRuntime()
+	svcRt.process, err = s.instance.PrepareProcess(ctx, svcRt.processCtx)
 	if err != nil {
 		return errutil.Wrap(err)
 	}
 
-	svcRt := newServiceRuntime(process)
 	err = s.startProcess(ctx, svcRt)
 	if err != nil {
 		return errutil.Wrap(err)
@@ -179,7 +184,7 @@ func (s *Service) waitActive(waitActiveCtx context.Context) {
 }
 
 func (s *Service) stop(ctx context.Context) {
-	if s.runtime == nil {
+	if !s.Running() {
 		s.logger.DebugC(ctx, "process has not started yet, no need stop")
 		return
 	}
@@ -188,6 +193,7 @@ func (s *Service) stop(ctx context.Context) {
 	ctx = log.AppendCtx(ctx, "tag", "stopping")
 	s.stopProcess(ctx, s.runtime)
 	s.status = StatusInactive
+	s.runtime.Close()
 	s.runtime = nil
 }
 

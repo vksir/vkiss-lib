@@ -1,9 +1,8 @@
-package subprocess
+package service
 
 import (
 	"bufio"
 	"context"
-	"errors"
 	"github.com/vksir/vkiss-lib/pkg/log"
 	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"io"
@@ -13,12 +12,7 @@ import (
 	"time"
 )
 
-var (
-	ErrAlreadyStarted = errors.New("already started")
-	ErrNotStartedYet  = errors.New("not started yet")
-)
-
-type OutFunc = func(*string)
+type OutputFunc func([]byte)
 
 type outFuncCtrAction int
 
@@ -29,7 +23,7 @@ const (
 
 type outFuncCtrMsg struct {
 	name    string
-	outFunc OutFunc
+	outFunc OutputFunc
 	action  outFuncCtrAction
 }
 
@@ -42,24 +36,26 @@ type SubProcess struct {
 
 	log             *log.Logger
 	timeout         time.Duration
-	outFuncs        map[string]OutFunc
+	outFuncs        map[string]OutputFunc
 	outFuncCtrlChan chan outFuncCtrMsg
 
-	cmd    *exec.Cmd
-	ctx    context.Context
-	cancel context.CancelFunc
-	stdin  io.Writer
-	stdout io.Reader
-	stderr io.Reader
+	cmd      *exec.Cmd
+	ctx      context.Context
+	cancel   context.CancelFunc
+	stdin    io.Writer
+	stdout   io.Reader
+	stderr   io.Reader
+	waitChan chan error
 }
 
-func New(name, exec string, args []string) *SubProcess {
+func NewSubprocess(name, exec string, args []string) *SubProcess {
 	p := &SubProcess{
 		name:            name,
 		exec:            exec,
 		args:            args,
-		outFuncs:        make(map[string]OutFunc),
+		outFuncs:        make(map[string]OutputFunc),
 		outFuncCtrlChan: make(chan outFuncCtrMsg, 1),
+		waitChan:        make(chan error, 1),
 	}
 	return p
 }
@@ -84,7 +80,7 @@ func (p *SubProcess) SetDir(dir string) *SubProcess {
 	return p
 }
 
-func (p *SubProcess) RegisterOutFunc(name string, f OutFunc) {
+func (p *SubProcess) RegisterOutputFunc(name string, f OutputFunc) {
 	p.log.Info("begin register outFunc", "name", name, "outFunc", f)
 	p.outFuncCtrlChan <- outFuncCtrMsg{
 		name:    name,
@@ -94,7 +90,7 @@ func (p *SubProcess) RegisterOutFunc(name string, f OutFunc) {
 	p.log.Info("end register outFunc", "name", name, "outFunc", f)
 }
 
-func (p *SubProcess) UnregisterOutFunc(name string) {
+func (p *SubProcess) UnregisterOutputFunc(name string) {
 	p.log.Info("begin unregister outFunc", "name", name)
 	p.outFuncCtrlChan <- outFuncCtrMsg{
 		name:   name,
@@ -195,13 +191,14 @@ func (p *SubProcess) Wait() error {
 		return errutil.Wrap(ErrNotStartedYet)
 	}
 	p.log.Info("begin wait subprocess")
-	<-p.ctx.Done()
-	return p.ctx.Err()
+	return <-p.waitChan
 }
 
 func (p *SubProcess) blockWait() {
 	log.Info("begin block wait subprocess")
 	err := p.cmd.Wait()
+	p.waitChan <- err
+	p.cancel()
 	log.Warn("subprocess stopped", "err", err)
 }
 
@@ -211,7 +208,7 @@ func (p *SubProcess) loopOutput() {
 	scanner := bufio.NewScanner(io.MultiReader(p.stdout, p.stderr))
 
 	for scanner.Scan() {
-		out := scanner.Text()
+		out := scanner.Bytes()
 
 		select {
 		case <-p.ctx.Done():
@@ -230,7 +227,7 @@ func (p *SubProcess) loopOutput() {
 		}
 
 		for _, f := range p.outFuncs {
-			f(&out)
+			f(out)
 		}
 	}
 }

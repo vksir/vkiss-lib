@@ -10,14 +10,17 @@ import (
 	"strings"
 )
 
-var home string
-
-func Home() string {
-	var err error
-	home, err = os.UserHomeDir()
+var Home = func() string {
+	p, err := os.UserHomeDir()
 	errutil.Check(err)
-	return home
-}
+	return p
+}()
+
+var Executable = func() string {
+	p, err := os.Executable()
+	errutil.Check(err)
+	return p
+}()
 
 func Exist(path string) bool {
 	_, err := os.Stat(path)
@@ -39,7 +42,7 @@ func Rm(path string) error {
 func MkDir(paths ...string) error {
 	for _, p := range paths {
 		if err := os.MkdirAll(p, 0o755); err != nil {
-			return errutil.WrapPathErr("MkdirAll", p, err)
+			return errutil.WrapPath("MkdirAll", p, err)
 		}
 	}
 	return nil
@@ -126,7 +129,7 @@ func Zip(src string, dst string) error {
 
 	err = filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return errutil.WrapPathErr("WalkFunc", path, err)
+			return err
 		}
 
 		// 获取相对路径
@@ -135,67 +138,70 @@ func Zip(src string, dst string) error {
 			relativePath += "/"
 		}
 
-		w, err := zipWriter.Create(relativePath)
+		dstWriter, err := zipWriter.Create(relativePath)
 		if err != nil {
-			return errutil.WrapPathErr("zipWriter.Create", path, err)
+			return errutil.WrapPath("zipWriter.Create", path, err)
 		}
 
-		r, err := os.Open(path)
+		srcReader, err := os.Open(path)
 		if err != nil {
-			return errutil.WrapPathErr("os.Open", path, err)
+			return errutil.WrapPath("os.Open", path, err)
 		}
-		defer func() { _ = r.Close() }()
+		defer func() { _ = srcReader.Close() }()
 
-		_, err = io.Copy(w, r)
+		_, err = io.Copy(dstWriter, srcReader)
 		if err != nil {
-			return errutil.WrapPathErr("io.Copy", path, err)
+			return errutil.WrapPath("io.Copy", path, err)
 		}
 		return err
 	})
-	if err != nil {
-		return errutil.Wrap(err)
-	}
-	return nil
+	return err
 }
 
 func Unzip(src string, dst string) error {
-	zipFile, err := zip.OpenReader(src)
+	err := MkDir(dst)
 	if err != nil {
-		return errutil.WrapPathErr("zip.OpenReader", src, err)
+		return errutil.WrapPath("MkDir", dst, err)
 	}
-	defer func() { _ = zipFile.Close() }()
+
+	zipReader, err := zip.OpenReader(src)
+	if err != nil {
+		return errutil.WrapPath("zip.OpenReader", src, err)
+	}
+	defer func() { _ = zipReader.Close() }()
 
 	// 遍历 ZIP 文件中的所有条目
-	for _, f := range zipFile.File {
-		path := filepath.Join(dst, f.Name)
+	for _, srcFile := range zipReader.File {
+		dstPath := filepath.Join(dst, srcFile.Name)
 
 		// 如果是目录，仅创建目录
-		if f.FileInfo().IsDir() {
-			err = os.MkdirAll(path, 0755)
+		if srcFile.FileInfo().IsDir() {
+			err = MkDir(dstPath)
 			if err != nil {
-				return errutil.WrapPathErr("os.MkdirAll", path, err)
+				return errutil.WrapPath("MkDir", dstPath, err)
 			}
 			continue
 		}
 
 		err = func() error {
 			// 创建目标文件
-			w, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			dstWriter, err := os.OpenFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, srcFile.Mode())
 			if err != nil {
-				return errutil.WrapPathErr("os.OpenFile", path, err)
+				return errutil.WrapPath("os.OpenFile", dstPath, err)
 			}
-			defer func() { _ = w.Close() }()
+			defer func() { _ = dstWriter.Close() }()
 
-			// 打开 ZIP 文件中的条目并复制内容到目标文件中
-			r, err := f.Open()
+			// 打开 ZIP 文件中的条目
+			srcReader, err := srcFile.Open()
 			if err != nil {
-				return errutil.WrapPathErr("Open", path, err)
+				return errutil.WrapPath("zip.File.Open", dstPath, err)
 			}
-			defer func() { _ = r.Close() }()
+			defer func() { _ = srcReader.Close() }()
 
-			_, err = io.Copy(w, r)
+			// 复制内容到目标文件中
+			_, err = io.Copy(dstWriter, srcReader)
 			if err != nil {
-				return errutil.WrapPathErr("io.Copy", path, err)
+				return errutil.WrapPath("io.Copy", dstPath, err)
 			}
 			return nil
 		}()
@@ -231,6 +237,6 @@ func InstallSelf(path string) error {
 
 func init() {
 	var err error
-	home, err = os.UserHomeDir()
+	Home, err = os.UserHomeDir()
 	errutil.Check(err)
 }

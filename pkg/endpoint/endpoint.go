@@ -13,7 +13,7 @@ var (
 	validate = validator.New(validator.WithRequiredStructEnabled())
 )
 
-type Handler interface {
+type Endpoint interface {
 	HttpMethod() string
 	HttpRelativePath(relativePath string) string
 	HttpHandler() gin.HandlerFunc
@@ -25,14 +25,37 @@ type Response struct {
 	Data    any    `json:"data"`
 }
 
-// GetResource func indexResource(id string) (any, error)
-type GetResource[P any] func(ctx context.Context, id string) (response P, err error)
+// Get func getResource() (any, error)
+type Get[P any] func(ctx context.Context) (response P, err error)
 
-func (f GetResource[P]) HttpMethod() string {
+func (f Get[P]) HttpMethod() string {
 	return http.MethodGet
 }
 
-func (f GetResource[P]) HttpRelativePath(relativePath string) string {
+func (f Get[P]) HttpRelativePath(relativePath string) string {
+	return relativePath
+}
+
+func (f Get[P]) HttpHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		resp, err := f(c)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError,
+				Response{Code: http.StatusInternalServerError, Message: err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, Response{Data: resp})
+	}
+}
+
+// GetByID func indexResource(id string) (any, error)
+type GetByID[P any] func(ctx context.Context, id string) (response P, err error)
+
+func (f GetByID[P]) HttpMethod() string {
+	return http.MethodGet
+}
+
+func (f GetByID[P]) HttpRelativePath(relativePath string) string {
 	path, err := url.JoinPath(relativePath, ":id")
 	if err != nil {
 		panic(fmt.Sprintf("invalid relative path %s: %s", relativePath, err))
@@ -40,7 +63,7 @@ func (f GetResource[P]) HttpRelativePath(relativePath string) string {
 	return path
 }
 
-func (f GetResource[P]) HttpHandler() gin.HandlerFunc {
+func (f GetByID[P]) HttpHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		resp, err := f(c, id)
@@ -53,18 +76,18 @@ func (f GetResource[P]) HttpHandler() gin.HandlerFunc {
 	}
 }
 
-// ListResource func listResource(a any) ([]any, error)
-type ListResource[Q, P any] func(ctx context.Context, request Q) (response []P, err error)
+// GetList func listResource(a any) ([]any, error)
+type GetList[Q, P any] func(ctx context.Context, request Q) (response []P, err error)
 
-func (f ListResource[Q, P]) HttpMethod() string {
+func (f GetList[Q, P]) HttpMethod() string {
 	return http.MethodGet
 }
 
-func (f ListResource[Q, P]) HttpRelativePath(relativePath string) string {
+func (f GetList[Q, P]) HttpRelativePath(relativePath string) string {
 	return relativePath
 }
 
-func (f ListResource[Q, P]) HttpHandler() gin.HandlerFunc {
+func (f GetList[Q, P]) HttpHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req Q
 		err := c.ShouldBindQuery(&req)
@@ -89,18 +112,18 @@ func (f ListResource[Q, P]) HttpHandler() gin.HandlerFunc {
 	}
 }
 
-// CreateResource func createResource(a any) (any, error)
-type CreateResource[Q, P any] func(ctx context.Context, request Q) (response P, err error)
+// Create func createResource(a any) (any, error)
+type Create[Q, P any] func(ctx context.Context, request Q) (response P, err error)
 
-func (f CreateResource[Q, P]) HttpMethod() string {
+func (f Create[Q, P]) HttpMethod() string {
 	return http.MethodPost
 }
 
-func (f CreateResource[Q, P]) HttpRelativePath(relativePath string) string {
+func (f Create[Q, P]) HttpRelativePath(relativePath string) string {
 	return relativePath
 }
 
-func (f CreateResource[Q, P]) HttpHandler() gin.HandlerFunc {
+func (f Create[Q, P]) HttpHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req Q
 		err := c.ShouldBindJSON(&req)
@@ -125,14 +148,50 @@ func (f CreateResource[Q, P]) HttpHandler() gin.HandlerFunc {
 	}
 }
 
-// UpdateResource func updateResource(id string, a any) (any, error)
-type UpdateResource[Q, P any] func(ctx context.Context, id string, request Q) (response P, err error)
+// Update func updateResource(a any) (any, error)
+type Update[Q, P any] func(ctx context.Context, request Q) (response P, err error)
 
-func (f UpdateResource[Q, P]) HttpMethod() string {
+func (f Update[Q, P]) HttpMethod() string {
 	return http.MethodPut
 }
 
-func (f UpdateResource[Q, P]) HttpRelativePath(relativePath string) string {
+func (f Update[Q, P]) HttpRelativePath(relativePath string) string {
+	return relativePath
+}
+
+func (f Update[Q, P]) HttpHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req Q
+		err := c.ShouldBindJSON(&req)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest,
+				Response{Code: http.StatusBadRequest, Message: err.Error()})
+			return
+		}
+		err = validate.Struct(&req)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest,
+				Response{Code: http.StatusBadRequest, Message: err.Error()})
+			return
+		}
+		resp, err := f(c, req)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError,
+				Response{Code: http.StatusInternalServerError, Message: err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, Response{Data: resp})
+	}
+}
+
+// UpdateByID func updateResource(id string, a any) (any, error)
+type UpdateByID[Q, P any] func(ctx context.Context, id string, request Q) (response P, err error)
+
+func (f UpdateByID[Q, P]) HttpMethod() string {
+	return http.MethodPut
+}
+
+func (f UpdateByID[Q, P]) HttpRelativePath(relativePath string) string {
 	path, err := url.JoinPath(relativePath, ":id")
 	if err != nil {
 		panic(fmt.Sprintf("invalid relative path %s: %s", relativePath, err))
@@ -140,7 +199,7 @@ func (f UpdateResource[Q, P]) HttpRelativePath(relativePath string) string {
 	return path
 }
 
-func (f UpdateResource[Q, P]) HttpHandler() gin.HandlerFunc {
+func (f UpdateByID[Q, P]) HttpHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		var req Q
@@ -166,14 +225,14 @@ func (f UpdateResource[Q, P]) HttpHandler() gin.HandlerFunc {
 	}
 }
 
-// DeleteResource func deleteResource(id string) error
-type DeleteResource func(ctx context.Context, id string) (err error)
+// DeleteByID func deleteResource(id string) error
+type DeleteByID func(ctx context.Context, id string) (err error)
 
-func (f DeleteResource) HttpMethod() string {
+func (f DeleteByID) HttpMethod() string {
 	return http.MethodDelete
 }
 
-func (f DeleteResource) HttpRelativePath(relativePath string) string {
+func (f DeleteByID) HttpRelativePath(relativePath string) string {
 	path, err := url.JoinPath(relativePath, ":id")
 	if err != nil {
 		panic(fmt.Sprintf("invalid relative path %s: %s", relativePath, err))
@@ -181,7 +240,7 @@ func (f DeleteResource) HttpRelativePath(relativePath string) string {
 	return path
 }
 
-func (f DeleteResource) HttpHandler() gin.HandlerFunc {
+func (f DeleteByID) HttpHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		err := f(c, id)
@@ -194,56 +253,70 @@ func (f DeleteResource) HttpHandler() gin.HandlerFunc {
 	}
 }
 
-// GetOnlyOneResource func getResource() (any, error)
-type GetOnlyOneResource[P any] func(ctx context.Context) (response P, err error)
+// DownloadByID func downloadFile(id string) error
+type DownloadByID func(ctx context.Context, id string) (downloadPath string, afterDownload func(), err error)
 
-func (f GetOnlyOneResource[P]) HttpMethod() string {
+func (f DownloadByID) HttpMethod() string {
 	return http.MethodGet
 }
 
-func (f GetOnlyOneResource[P]) HttpRelativePath(relativePath string) string {
-	return relativePath
+func (f DownloadByID) HttpRelativePath(relativePath string) string {
+	path, err := url.JoinPath(relativePath, ":id")
+	if err != nil {
+		panic(fmt.Sprintf("invalid relative path %s: %s", relativePath, err))
+	}
+	return path
 }
 
-func (f GetOnlyOneResource[P]) HttpHandler() gin.HandlerFunc {
+func (f DownloadByID) HttpHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		resp, err := f(c)
+		id := c.Param("id")
+		downloadPath, afterDownload, err := f(c, id)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError,
 				Response{Code: http.StatusInternalServerError, Message: err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, Response{Data: resp})
+		c.File(downloadPath)
+		afterDownload()
 	}
 }
 
-// UpdateOnlyOneResource func updateResource(a any) (any, error)
-type UpdateOnlyOneResource[Q, P any] func(ctx context.Context, request Q) (response P, err error)
+// Upload func uploadFile(filename string) (string, error)
+type Upload[P any] func(ctx context.Context, filename string) (
+	uploadPath string,
+	afterUpload func() (response P, err error),
+	err error)
 
-func (f UpdateOnlyOneResource[Q, P]) HttpMethod() string {
-	return http.MethodPut
+func (f Upload[P]) HttpMethod() string {
+	return http.MethodPost
 }
 
-func (f UpdateOnlyOneResource[Q, P]) HttpRelativePath(relativePath string) string {
+func (f Upload[P]) HttpRelativePath(relativePath string) string {
 	return relativePath
 }
 
-func (f UpdateOnlyOneResource[Q, P]) HttpHandler() gin.HandlerFunc {
+func (f Upload[P]) HttpHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req Q
-		err := c.ShouldBindJSON(&req)
+		file, err := c.FormFile("file")
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusBadRequest,
 				Response{Code: http.StatusBadRequest, Message: err.Error()})
 			return
 		}
-		err = validate.Struct(&req)
+		uploadPath, afterUpload, err := f(c, file.Filename)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest,
-				Response{Code: http.StatusBadRequest, Message: err.Error()})
+			c.AbortWithStatusJSON(http.StatusInternalServerError,
+				Response{Code: http.StatusInternalServerError, Message: err.Error()})
 			return
 		}
-		resp, err := f(c, req)
+		err = c.SaveUploadedFile(file, uploadPath)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError,
+				Response{Code: http.StatusInternalServerError, Message: err.Error()})
+			return
+		}
+		resp, err := afterUpload()
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError,
 				Response{Code: http.StatusInternalServerError, Message: err.Error()})
@@ -255,7 +328,7 @@ func (f UpdateOnlyOneResource[Q, P]) HttpHandler() gin.HandlerFunc {
 
 type Resource struct {
 	RelativePath string
-	Handler      []Handler
+	Handler      []Endpoint
 }
 
 func (r *Resource) LoadRouter(g *gin.RouterGroup) {
