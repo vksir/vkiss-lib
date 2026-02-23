@@ -3,32 +3,31 @@ package fileutil
 import (
 	"github.com/vksir/vkiss-lib/pkg/log"
 	"github.com/vksir/vkiss-lib/pkg/util/errutil"
+	"os"
 	"path/filepath"
 )
 
-type TmpPath string
+type TempDir string
 
-func NewTmpPath(elem ...string) (TmpPath, error) {
-	path := filepath.Join(elem...)
-	if Exist(path) {
-		log.Error("tmp path already exists, clear it", "path", path)
-		err := Rm(path)
-		if err != nil {
-			return "", errutil.Wrap(err)
-		}
+func NewTempDir(dir, pattern string) (TempDir, error) {
+	path, err := os.MkdirTemp(dir, pattern)
+	if err != nil {
+		return "", errutil.Wrap(err)
 	}
-	return TmpPath(path), nil
+	return TempDir(path), nil
 }
 
-func (p TmpPath) String() string {
+func (p TempDir) String() string {
 	return string(p)
 }
 
-func (p TmpPath) Clear() {
-	err := Rm(string(p))
+func (p TempDir) Join(elem ...string) string {
+	return filepath.Join(append([]string{string(p)}, elem...)...)
+}
+
+func (p TempDir) Clear() {
+	err := os.RemoveAll(string(p))
 	if err != nil {
 		log.Error("clear tmp path failed", "path", p, "err", err)
-	} else {
-		log.Info("clear tmp path success", "path", p)
 	}
 }

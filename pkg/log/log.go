@@ -92,6 +92,13 @@ func ErrorFC(ctx context.Context, format string, a ...any) {
 	logger.logF(ctx, slog.LevelError, format, a...)
 }
 
+func Close(closer io.Closer) {
+	err := closer.Close()
+	if err != nil {
+		logger.Log(slog.LevelError, "close failed", "err", err)
+	}
+}
+
 type Logger struct {
 	logger *slog.Logger
 	level  *slog.LevelVar

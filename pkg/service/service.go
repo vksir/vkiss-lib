@@ -43,16 +43,10 @@ const (
 type Interface interface {
 	PrepareProcess(ctx context.Context, processCtx context.Context) (map[string]*SubProcess, error)
 	WaitActive(waitActiveCtx context.Context) bool
-	GracefulShutdown(ctx context.Context, process map[string]*SubProcess)
-}
-
-func InterruptGracefulShutdown(ctx context.Context, process map[string]*SubProcess) {
-	for _, p := range process {
-		err := p.Interrupt()
-		if err != nil {
-			log.ErrorC(ctx, "interrupt failed", "process", p.Name(), "err", err)
-		}
-	}
+	GracefulShutdown(ctx context.Context, process map[string]*SubProcess) time.Duration
+	Install(ctx context.Context) error
+	Uninstall(ctx context.Context) error
+	Update(ctx context.Context) error
 }
 
 type serviceRuntime struct {
@@ -116,6 +110,7 @@ func (s *Service) Start(ctx context.Context) error {
 		return ErrBusy
 	}
 	defer s.busyLock.Unlock()
+	ctx = log.AppendCtx(ctx, "tag", "starting")
 	return s.start(ctx)
 }
 
@@ -124,6 +119,7 @@ func (s *Service) Stop(ctx context.Context) error {
 		return ErrBusy
 	}
 	defer s.busyLock.Unlock()
+	ctx = log.AppendCtx(ctx, "tag", "stopping")
 	s.stop(ctx)
 	return nil
 }
@@ -133,7 +129,58 @@ func (s *Service) Restart(ctx context.Context) error {
 		return ErrBusy
 	}
 	defer s.busyLock.Unlock()
+	ctx = log.AppendCtx(ctx, "tag", "restarting")
 	return s.restart(ctx)
+}
+
+func (s *Service) Install(ctx context.Context) error {
+	if !s.busyLock.TryLock() {
+		return ErrBusy
+	}
+	defer s.busyLock.Unlock()
+	ctx = log.AppendCtx(ctx, "tag", "installing")
+	s.logger.InfoC(ctx, "begin install")
+	return s.instance.Install(ctx)
+}
+
+func (s *Service) Uninstall(ctx context.Context) error {
+	if !s.busyLock.TryLock() {
+		return ErrBusy
+	}
+	defer s.busyLock.Unlock()
+
+	ctx = log.AppendCtx(ctx, "tag", "uninstalling")
+	s.logger.InfoC(ctx, "begin uninstall")
+	s.stop(ctx)
+	err := s.instance.Uninstall(ctx)
+	if err != nil {
+		return errutil.Wrap(err)
+	}
+	return nil
+}
+
+func (s *Service) Update(ctx context.Context) error {
+	if !s.busyLock.TryLock() {
+		return ErrBusy
+	}
+	defer s.busyLock.Unlock()
+
+	ctx = log.AppendCtx(ctx, "tag", "upgrading")
+	isRunning := s.Running()
+	if isRunning {
+		s.stop(ctx)
+	}
+	err := s.instance.Update(ctx)
+	if err != nil {
+		return errutil.Wrap(err)
+	}
+	if isRunning {
+		err = s.start(ctx)
+		if err != nil {
+			return errutil.Wrap(err)
+		}
+	}
+	return nil
 }
 
 func (s *Service) start(ctx context.Context) error {
@@ -141,9 +188,9 @@ func (s *Service) start(ctx context.Context) error {
 		return ErrAlreadyStarted
 	}
 
+	s.logger.InfoC(ctx, "begin start")
 	var err error
 	s.status = StatusStarting
-	ctx = log.AppendCtx(ctx, "tag", "starting")
 	svcRt := newServiceRuntime()
 	svcRt.process, err = s.instance.PrepareProcess(ctx, svcRt.processCtx)
 	if err != nil {
@@ -189,8 +236,8 @@ func (s *Service) stop(ctx context.Context) {
 		return
 	}
 
+	s.logger.InfoC(ctx, "begin stop")
 	s.status = StatusStopping
-	ctx = log.AppendCtx(ctx, "tag", "stopping")
 	s.stopProcess(ctx, s.runtime)
 	s.status = StatusInactive
 	s.runtime.Close()
@@ -198,7 +245,6 @@ func (s *Service) stop(ctx context.Context) {
 }
 
 func (s *Service) restart(ctx context.Context) error {
-	ctx = log.AppendCtx(ctx, "tag", "restarting")
 	s.logger.InfoC(ctx, "begin restart")
 	s.stop(ctx)
 	err := s.start(ctx)
@@ -225,11 +271,10 @@ func (s *Service) startProcess(ctx context.Context, svcRt *serviceRuntime) error
 }
 
 func (s *Service) stopProcess(ctx context.Context, svcRt *serviceRuntime) {
+	s.logger.InfoC(ctx, "begin stop process")
+	waitTime := s.instance.GracefulShutdown(ctx, svcRt.process)
 
-	s.logger.InfoC(ctx, "begin graceful shutdown process")
-	s.instance.GracefulShutdown(ctx, svcRt.process)
-
-	timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), waitTime)
 	defer timeoutCancel()
 	for _, p := range svcRt.process {
 		if p.Ctx() != nil {
@@ -246,5 +291,4 @@ func (s *Service) stopProcess(ctx context.Context, svcRt *serviceRuntime) {
 
 	s.logger.ErrorC(ctx, "graceful shutdown process timeout, begin kill")
 	svcRt.processCancel()
-	return
 }
