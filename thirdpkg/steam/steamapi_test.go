@@ -8,7 +8,7 @@ import (
 )
 
 func TestGetPublishedFileDetails(t *testing.T) {
-	data, err := GetPublishedFileDetails("3485622209")
+	data, err := GetPublishedFileDetails("3485622209", "1699194522")
 	assert.Nil(t, err)
 	fmt.Println(convutil.MustJsonString(data))
 }

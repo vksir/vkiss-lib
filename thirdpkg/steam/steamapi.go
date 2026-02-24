@@ -9,51 +9,57 @@ import (
 	"strconv"
 )
 
+type Publishedfiledetail struct {
+	Publishedfileid       string `json:"publishedfileid"`
+	Result                int    `json:"result"`
+	Creator               string `json:"creator"`
+	CreatorAppId          int    `json:"creator_app_id"`
+	ConsumerAppId         int    `json:"consumer_app_id"`
+	Filename              string `json:"filename"`
+	FileSize              string `json:"file_size"`
+	FileUrl               string `json:"file_url"`
+	HcontentFile          string `json:"hcontent_file"`
+	PreviewUrl            string `json:"preview_url"`
+	HcontentPreview       string `json:"hcontent_preview"`
+	Title                 string `json:"title"`
+	Description           string `json:"description"`
+	TimeCreated           int    `json:"time_created"`
+	TimeUpdated           int    `json:"time_updated"`
+	Visibility            int    `json:"visibility"`
+	Banned                int    `json:"banned"`
+	BanReason             string `json:"ban_reason"`
+	Subscriptions         int    `json:"subscriptions"`
+	Favorited             int    `json:"favorited"`
+	LifetimeSubscriptions int    `json:"lifetime_subscriptions"`
+	LifetimeFavorited     int    `json:"lifetime_favorited"`
+	Views                 int    `json:"views"`
+	Tags                  []struct {
+		Tag string `json:"tag"`
+	} `json:"tags"`
+}
+
 type GetPublishedFileDetailsResponse struct {
 	Response struct {
-		Result               int `json:"result"`
-		Resultcount          int `json:"resultcount"`
-		Publishedfiledetails []struct {
-			Publishedfileid       string `json:"publishedfileid"`
-			Result                int    `json:"result"`
-			Creator               string `json:"creator"`
-			CreatorAppId          int    `json:"creator_app_id"`
-			ConsumerAppId         int    `json:"consumer_app_id"`
-			Filename              string `json:"filename"`
-			FileSize              string `json:"file_size"`
-			FileUrl               string `json:"file_url"`
-			HcontentFile          string `json:"hcontent_file"`
-			PreviewUrl            string `json:"preview_url"`
-			HcontentPreview       string `json:"hcontent_preview"`
-			Title                 string `json:"title"`
-			Description           string `json:"description"`
-			TimeCreated           int    `json:"time_created"`
-			TimeUpdated           int    `json:"time_updated"`
-			Visibility            int    `json:"visibility"`
-			Banned                int    `json:"banned"`
-			BanReason             string `json:"ban_reason"`
-			Subscriptions         int    `json:"subscriptions"`
-			Favorited             int    `json:"favorited"`
-			LifetimeSubscriptions int    `json:"lifetime_subscriptions"`
-			LifetimeFavorited     int    `json:"lifetime_favorited"`
-			Views                 int    `json:"views"`
-			Tags                  []struct {
-				Tag string `json:"tag"`
-			} `json:"tags"`
-		} `json:"publishedfiledetails"`
+		Result               int                   `json:"result"`
+		Resultcount          int                   `json:"resultcount"`
+		Publishedfiledetails []Publishedfiledetail `json:"publishedfiledetails"`
 	} `json:"response"`
 }
 
-func GetPublishedFileDetails(workshopId ...string) (GetPublishedFileDetailsResponse, error) {
+func GetPublishedFileDetails(workshopID ...string) (GetPublishedFileDetailsResponse, error) {
+	var res GetPublishedFileDetailsResponse
+	if len(workshopID) == 0 {
+		return res, fmt.Errorf("workshopID is empty")
+	}
+
 	url := "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/"
 	data := map[string]string{
-		"itemcount": strconv.Itoa(len(workshopId)),
+		"itemcount": strconv.Itoa(len(workshopID)),
 	}
-	for i, id := range workshopId {
+	for i, id := range workshopID {
 		key := fmt.Sprintf("publishedfileids[%d]", i)
 		data[key] = id
 	}
-	var res GetPublishedFileDetailsResponse
 	err := request(http.MethodPost, url, data, &res)
 	return res, err
 }
