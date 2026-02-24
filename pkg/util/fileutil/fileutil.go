@@ -2,6 +2,7 @@ package fileutil
 
 import (
 	"errors"
+	"github.com/vksir/vkiss-lib/pkg/log"
 	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"io"
 	"os"
@@ -115,14 +116,16 @@ func Mv(src, dst string) error {
 	return os.Rename(src, dst)
 }
 
-func InstallSelf(path string) error {
+func InstallSelf(dst string) error {
 	src, err := os.Executable()
 	if err != nil {
 		return errutil.Wrap(err)
 	}
 
-	dst := path
-
+	err = MkDir(filepath.Dir(dst))
+	if err != nil {
+		return errutil.Wrap(err)
+	}
 	err = Remove(dst)
 	if err != nil {
 		return errutil.Wrap(err)
@@ -131,7 +134,13 @@ func InstallSelf(path string) error {
 	if err != nil {
 		return errutil.Wrap(err)
 	}
+	log.Info("copy exec", "src", src, "dst", dst)
 	err = os.Chmod(dst, 0755)
+	if err != nil {
+		return errutil.Wrap(err)
+	}
+
+	err = Remove(src)
 	if err != nil {
 		return errutil.Wrap(err)
 	}

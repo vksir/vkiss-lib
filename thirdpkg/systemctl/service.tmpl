@@ -5,6 +5,7 @@ Wants = network.target
 
 [Service]
 Type = simple
+KillMode=control-group
 
 {{- if .WorkingDirectory}}
 WorkingDirectory={{.WorkingDirectory}}

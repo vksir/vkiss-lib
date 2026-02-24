@@ -57,6 +57,12 @@ func (s *Service) Enable() error {
 	return s.action("enable")
 }
 
+func (s *Service) DaemonReload() error {
+	cmd := exec.Command("systemctl", "daemon-reload")
+	_, err := cmdutil.RunCmd(cmd)
+	return err
+}
+
 func (s *Service) action(a string) error {
 	cmd := exec.Command("systemctl", a, s.ServiceName())
 	_, err := cmdutil.RunCmd(cmd)

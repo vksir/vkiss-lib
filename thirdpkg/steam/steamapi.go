@@ -7,6 +7,7 @@ import (
 	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 type Publishedfiledetail struct {
@@ -96,7 +97,7 @@ func GetNewsForApp(appId string) (GetNewsForAppResponse, error) {
 }
 
 func request(method, url string, data map[string]string, a any) error {
-	client := resty.New().R()
+	client := resty.New().SetTimeout(5 * time.Second).R()
 	if method == http.MethodGet {
 		client.SetQueryParams(data)
 	} else {
