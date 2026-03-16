@@ -3,29 +3,18 @@ package service
 import (
 	"bufio"
 	"context"
-	"github.com/vksir/vkiss-lib/pkg/log"
-	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"io"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/vksir/vkiss-lib/pkg/log"
+	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 )
 
 type OutputFunc func([]byte)
-
-type outFuncCtrAction int
-
-const (
-	addOutFuncAction outFuncCtrAction = iota
-	delOutFuncAction
-)
-
-type outFuncCtrMsg struct {
-	name    string
-	outFunc OutputFunc
-	action  outFuncCtrAction
-}
 
 type SubProcess struct {
 	name string
@@ -34,10 +23,10 @@ type SubProcess struct {
 	env  []string
 	dir  string
 
-	log             *log.Logger
-	timeout         time.Duration
-	outFuncs        map[string]OutputFunc
-	outFuncCtrlChan chan outFuncCtrMsg
+	log      *log.Logger
+	timeout  time.Duration
+	outFuncs map[string]OutputFunc
+	mu       sync.RWMutex
 
 	cmd      *exec.Cmd
 	ctx      context.Context
@@ -50,12 +39,11 @@ type SubProcess struct {
 
 func NewSubprocess(name, exec string, args []string) *SubProcess {
 	p := &SubProcess{
-		name:            name,
-		exec:            exec,
-		args:            args,
-		outFuncs:        make(map[string]OutputFunc),
-		outFuncCtrlChan: make(chan outFuncCtrMsg, 1),
-		waitChan:        make(chan error, 1),
+		name:     name,
+		exec:     exec,
+		args:     args,
+		outFuncs: make(map[string]OutputFunc),
+		waitChan: make(chan error, 1),
 	}
 	return p
 }
@@ -82,20 +70,17 @@ func (p *SubProcess) SetDir(dir string) *SubProcess {
 
 func (p *SubProcess) RegisterOutputFunc(name string, f OutputFunc) {
 	p.log.Info("begin register outFunc", "name", name, "outFunc", f)
-	p.outFuncCtrlChan <- outFuncCtrMsg{
-		name:    name,
-		outFunc: f,
-		action:  addOutFuncAction,
-	}
+	p.mu.Lock()
+	p.outFuncs[name] = f
+	p.mu.Unlock()
 	p.log.Info("end register outFunc", "name", name, "outFunc", f)
 }
 
 func (p *SubProcess) UnregisterOutputFunc(name string) {
 	p.log.Info("begin unregister outFunc", "name", name)
-	p.outFuncCtrlChan <- outFuncCtrMsg{
-		name:   name,
-		action: delOutFuncAction,
-	}
+	p.mu.Lock()
+	delete(p.outFuncs, name)
+	p.mu.Unlock()
 	p.log.Info("end unregister outFunc", "name", name)
 }
 
@@ -214,20 +199,13 @@ func (p *SubProcess) loopOutput() {
 		case <-p.ctx.Done():
 			p.log.Warn("exit loop output", "err", p.ctx.Err())
 			return
-		case msg := <-p.outFuncCtrlChan:
-			switch msg.action {
-			case addOutFuncAction:
-				p.outFuncs[msg.name] = msg.outFunc
-			case delOutFuncAction:
-				delete(p.outFuncs, msg.name)
-			default:
-				p.log.ErrorF("unexpected action", "action", msg.action)
-			}
 		default:
 		}
 
+		p.mu.RLock()
 		for _, f := range p.outFuncs {
 			f(out)
 		}
+		p.mu.RUnlock()
 	}
 }
