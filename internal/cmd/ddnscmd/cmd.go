@@ -2,6 +2,8 @@ package ddnscmd
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 	"github.com/vksir/vkiss-lib/internal/constant"
@@ -9,10 +11,9 @@ import (
 	"github.com/vksir/vkiss-lib/pkg/cfg"
 	"github.com/vksir/vkiss-lib/pkg/log"
 	"github.com/vksir/vkiss-lib/pkg/util/errutil"
-	"github.com/vksir/vkiss-lib/pkg/util/fileutil"
+	"github.com/vksir/vkiss-lib/pkg/util/installutil"
 	"github.com/vksir/vkiss-lib/thirdpkg/systemctl"
 	"github.com/vksir/vkiss-lib/thirdpkg/tencentcloud"
-	"time"
 )
 
 var (
@@ -88,14 +89,16 @@ func newInstallCmd() *cobra.Command {
 	installServerCmd := &cobra.Command{
 		Use: "server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return installServer()
+			log.Init("", "debug")
+			return installutil.InstallService(serverService, constant.ExePath)
 		},
 	}
 
 	installMonitorCmd := &cobra.Command{
 		Use: "monitor",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return installMonitor()
+			log.Init("", "debug")
+			return installutil.InstallService(monitorService, constant.ExePath)
 		},
 	}
 
@@ -186,56 +189,3 @@ var (
 		RestartOnFailure: true,
 	}
 )
-
-func installServer() error {
-	err := fileutil.InstallSelf(constant.ExePath)
-	if err != nil {
-		return errutil.Wrap(err)
-	}
-
-	err = serverService.Deploy()
-	if err != nil {
-		return errutil.Wrap(err)
-	}
-
-	err = serverService.Enable()
-	if err != nil {
-		return errutil.Wrap(err)
-	}
-
-	err = serverService.Restart()
-	if err != nil {
-		cmd := fmt.Sprintf("systemctl restart %s", serverService.Name)
-		log.Error("start server failed", "cmd", cmd, "err", err)
-	} else {
-		cmd := fmt.Sprintf("systemctl status %s", serverService.Name)
-		log.Info("install and start server success", "cmd", cmd)
-	}
-	return nil
-}
-func installMonitor() error {
-	err := fileutil.InstallSelf(constant.ExePath)
-	if err != nil {
-		return errutil.Wrap(err)
-	}
-
-	err = monitorService.Deploy()
-	if err != nil {
-		return errutil.Wrap(err)
-	}
-
-	err = monitorService.Enable()
-	if err != nil {
-		return errutil.Wrap(err)
-	}
-
-	err = monitorService.Restart()
-	if err != nil {
-		cmd := fmt.Sprintf("systemctl restart %s", monitorService.Name)
-		log.Error("start monitor failed", "cmd", cmd, "err", err)
-	} else {
-		cmd := fmt.Sprintf("systemctl status %s", monitorService.Name)
-		log.Info("install and start monitor success", "cmd", cmd)
-	}
-	return nil
-}
