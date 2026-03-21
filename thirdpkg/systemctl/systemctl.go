@@ -3,12 +3,13 @@ package systemctl
 import (
 	_ "embed"
 	"fmt"
-	"github.com/vksir/vkiss-lib/pkg/template"
-	"github.com/vksir/vkiss-lib/pkg/util/cmdutil"
-	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"github.com/vksir/vkiss-lib/pkg/template"
+	"github.com/vksir/vkiss-lib/pkg/util/cmdutil"
+	"github.com/vksir/vkiss-lib/pkg/util/errutil"
 )
 
 const (
@@ -47,6 +48,14 @@ func (s *Service) Deploy() error {
 		return errutil.Wrap(err)
 	}
 	return nil
+}
+
+func (s *Service) Start() error {
+	return s.action("start")
+}
+
+func (s *Service) Stop() error {
+	return s.action("stop")
 }
 
 func (s *Service) Restart() error {
