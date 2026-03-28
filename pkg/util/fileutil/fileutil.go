@@ -2,6 +2,7 @@ package fileutil
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -41,7 +42,7 @@ func Remove(path string) error {
 func MkDir(paths ...string) error {
 	for _, p := range paths {
 		if err := os.MkdirAll(p, 0o755); err != nil {
-			return errutil.WrapPath("MkdirAll", p, err)
+			return fmt.Errorf("MkdirAll %s: %w", p, err)
 		}
 	}
 	return nil

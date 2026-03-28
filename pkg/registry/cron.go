@@ -15,11 +15,12 @@ func RegisterCronJob(name string, interval time.Duration, job CronJob) {
 	gCronJobCancel[name] = cancel
 
 	notifyChan := make(chan struct{}, 1)
-	Subscribe(getCronJobTopic(name), name, func(ctx context.Context, msgAny any) {
+	Subscribe(getCronJobTopic(name), name, func(ctx context.Context, msgAny any) error {
 		select {
 		case <-ctx.Done():
 		case <-notifyChan:
 		}
+		return nil
 	})
 
 	ctx = log.AppendCtx(ctx, "cron_job", name)

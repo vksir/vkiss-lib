@@ -9,7 +9,7 @@ import (
 var gTopics = make(map[string]map[string]Callback)
 var gTopicsLock sync.RWMutex
 
-type Callback = func(ctx context.Context, msgAny any)
+type Callback = func(ctx context.Context, msgAny any) error
 
 func Notify(ctx context.Context, topic string, msg any) {
 	gTopicsLock.RLock()
@@ -18,8 +18,11 @@ func Notify(ctx context.Context, topic string, msg any) {
 	log.InfoC(ctx, "notify", "topic", topic, "msg", msg)
 	tp, ok := gTopics[topic]
 	if ok {
-		for _, callback := range tp {
-			callback(ctx, msg)
+		for subs, callback := range tp {
+			err := callback(ctx, msg)
+			if err != nil {
+				log.ErrorC(ctx, "callback failed", "topic", topic, "subs", subs, "msg", msg)
+			}
 		}
 	}
 }

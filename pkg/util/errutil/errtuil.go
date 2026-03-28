@@ -11,6 +11,7 @@ import (
 var (
 	ErrNotFound = errors.New("not found")
 	ErrBusy     = errors.New("busy")
+	ErrErrType  = errors.New("error type")
 )
 
 func wrap(err error) error {
@@ -30,12 +31,12 @@ func WrapF(format string, a ...any) error {
 	return wrap(fmt.Errorf(format, a...))
 }
 
-func WrapPath(op string, path string, err error) error {
-	return wrap(&os.PathError{Op: op, Path: path, Err: err})
-}
-
 func WrapNotFound(dst string) error {
 	return wrap(fmt.Errorf("%w: %s", ErrNotFound, dst))
+}
+
+func WrapErrType(v any) error {
+	return wrap(fmt.Errorf("%w: %T", ErrErrType, v))
 }
 
 func Check(err error) {
